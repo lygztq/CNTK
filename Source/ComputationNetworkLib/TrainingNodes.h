@@ -3790,7 +3790,7 @@ class BatchNormalizationNode : public ComputationNodeNonLooping<ElemType>, publi
     }
 
     //typedef typename std::conditional<std::is_same<ElemType, half>::value, float, ElemType>::type StatType;
-	typedef typename ElemType StatType;
+	typedef ElemType StatType;
 
     // inputs
     // TODO: Change all of these throughout the codebase to 'class enum'. Also change all places where we still use integer constants.
