@@ -4262,7 +4262,7 @@ public:
             if (paramLayout.GetRank() == 2 && paramLayout[0] == 0 && paramLayout[1] == 1 && inputLayout.GetNumElements() > 0) // [0 x 1]
             {
                 size_t total = m_spatial ? inputLayout.GetDims().back() : inputLayout.GetNumElements();
-                TypedInput<StatType>(i)->ValidateInferInputDimsFrom(TensorShape(total, 1));
+                this->template TypedInput<StatType>(i)->ValidateInferInputDimsFrom(TensorShape(total, 1));
             }
         }
 #else
