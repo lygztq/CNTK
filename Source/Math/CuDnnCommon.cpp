@@ -23,9 +23,13 @@ template <>
 const float Consts<float>::Zero = 0;
 template <>
 const double Consts<double>::Zero = 0;
+template <>
+const half Consts<half>::Zero = 0;
+template <>
+const half Consts<half>::One = 1;
 
-const float Consts<half>::Zero = 0;
-const float Consts<half>::One = 1;
+//const float Consts<half>::Zero = 0;
+//const float Consts<half>::One = 1;
 
 
 CuDnnTensor::CuDnnTensor()
