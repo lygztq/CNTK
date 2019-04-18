@@ -61,6 +61,13 @@ struct /*interface*/ MATH_API MatrixBase : public std::enable_shared_from_this<M
     virtual MatrixType GetMatrixType() const = 0;
     virtual MatrixFormat GetFormat() const = 0;
     virtual void CastAssignValuesOf(const MatrixBase& other) = 0; // allows for mixed assignment with conversion
+	virtual size_t GetNumRows() const = 0;
+	virtual size_t GetNumCols() const = 0;
+	virtual size_t GetDiagSize() const = 0;
+	virtual size_t GetNumElements() const = 0;
+	virtual bool HasNoElements() const = 0;
+	virtual bool IsEmpty() const = 0;
+	virtual size_t BufferSize() const = 0;
     // TODO: Move more generic functions such as getting dims, resizing, and getting/setting as scalars in here.
     virtual ~MatrixBase();
 };
@@ -175,14 +182,14 @@ public:
     void TransferToDeviceIfNotThere(int id_to, bool isBeingMoved = false, bool emptyTransfer = false, bool updatePreferredDevice = true) const;
     CurrentDataLocation GetCurrentMatrixLocation() const { return m_currentDataLocation; };
     void SwitchToMatrixType(MatrixType newMatrixType, MatrixFormat newMatrixFormat, bool keepValues); // sets matrix type between dense and sparse
-    size_t GetNumRows() const;
-    size_t GetNumCols() const;
-    size_t GetDiagSize() const;
-    size_t GetNumElements() const;
-    bool HasNoElements() const { return GetNumElements() == 0; }
-    bool IsEmpty() const;
-    size_t BufferSize() const;
-    ElemType* Data() const;
+    size_t GetNumRows() const override;
+    size_t GetNumCols() const override;
+    size_t GetDiagSize() const override;
+    size_t GetNumElements() const override;
+    bool HasNoElements() const override { return GetNumElements() == 0; }
+    bool IsEmpty() const override;
+    size_t BufferSize() const override;
+	ElemType* Data() const;
     bool IsView() const;
 
     ElemType* CopyToArray() const;                                              // allocated by the callee but need to be deleted by the caller

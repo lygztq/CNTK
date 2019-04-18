@@ -34,143 +34,143 @@ static size_t logCounter = 0;
 template <class ElemType>
 class SimpleDistGradAggregator : public IDistGradAggregator<ElemType>
 {
-    UsingIDistGradAggregatorMembers;
+	UsingIDistGradAggregatorMembers;
 
 public:
-    SimpleDistGradAggregator(const MPIWrapperPtr& mpi, bool useAsyncAggregation, int deviceId, int syncStatsTrace, size_t packThresholdSizeInBytes = DEFAULT_PACK_THRESHOLD_SIZE_IN_BYTES)
-        : IDistGradAggregator<ElemType>(mpi), m_useAsyncAggregation(useAsyncAggregation), m_initialized(false), m_bufferedGradHeader(nullptr), m_syncStatsTrace(syncStatsTrace), m_iterationCount(0), m_packThresholdSizeInBytes(packThresholdSizeInBytes)
-    {
+	SimpleDistGradAggregator(const MPIWrapperPtr& mpi, bool useAsyncAggregation, int deviceId, int syncStatsTrace, size_t packThresholdSizeInBytes = DEFAULT_PACK_THRESHOLD_SIZE_IN_BYTES)
+		: IDistGradAggregator<ElemType>(mpi), m_useAsyncAggregation(useAsyncAggregation), m_initialized(false), m_bufferedGradHeader(nullptr), m_syncStatsTrace(syncStatsTrace), m_iterationCount(0), m_packThresholdSizeInBytes(packThresholdSizeInBytes)
+	{
 		deviceId; // used here for disable warning, just making compiler happy. Remove this useless var later.
-    }
+	}
 
-    ~SimpleDistGradAggregator()
-    {
-        for (size_t i = 0; i < m_recvHeaders.size(); ++i)
-            DistGradHeader::Destroy(m_recvHeaders[i]);
+	~SimpleDistGradAggregator()
+	{
+		for (size_t i = 0; i < m_recvHeaders.size(); ++i)
+			DistGradHeader::Destroy(m_recvHeaders[i]);
 
-        if (m_bufferedGradHeader != nullptr)
-            DistGradHeader::Destroy(m_bufferedGradHeader);
-    }
+		if (m_bufferedGradHeader != nullptr)
+			DistGradHeader::Destroy(m_bufferedGradHeader);
+	}
 
-    // Aggregate the gradient matrices across all nodes
-    bool AggregateGradients(const std::vector<Matrix<ElemType>*>& gradients, DistGradHeader* headerCPU, bool resetState) override
-    {
-        if (m_mpi->NumNodesInUse() == 1) // No need to aggregate anything.
-            return (headerCPU->numSamples != 0);
+	// Aggregate the gradient matrices across all nodes
+	bool AggregateGradients(const std::vector<Matrix<ElemType>*>& gradients, DistGradHeader* headerCPU, bool resetState) override
+	{
+		if (m_mpi->NumNodesInUse() == 1) // No need to aggregate anything.
+			return (headerCPU->numSamples != 0);
 
-        // Initialize NCCL
-        if (m_nccl == nullptr)
-            m_nccl.reset(new NcclComm(::CNTK::DeviceDescriptor::UseDefaultDevice().Id(), m_mpi));
+		// Initialize NCCL
+		if (m_nccl == nullptr)
+			m_nccl.reset(new NcclComm(::CNTK::DeviceDescriptor::UseDefaultDevice().Id(), m_mpi));
 
-        ResetState(gradients, headerCPU->numEvalNode, resetState);
-        bool showSyncPerfStats = (m_syncStatsTrace > 0) && ((m_iterationCount % m_syncStatsTrace) == 0);
-        m_iterationCount++;
+		ResetState(gradients, headerCPU->numEvalNode, resetState);
+		bool showSyncPerfStats = (m_syncStatsTrace > 0) && ((m_iterationCount % m_syncStatsTrace) == 0);
+		m_iterationCount++;
 
-        if (m_useAsyncAggregation)
-        {
-            // If we are performing async gradient aggregation, let's wait for the pending gradient aggregation to finish
-            // then swap the contents of the buffered gradients and the new gradient matrices and fire an async aggreagation
-            // of the new gradient matrices
-            if (m_pendingAsyncAggregation.valid())
-            {
-                Timer aggregationTimer;
-                if (showSyncPerfStats)
-                    aggregationTimer.Start();
+		if (m_useAsyncAggregation)
+		{
+			// If we are performing async gradient aggregation, let's wait for the pending gradient aggregation to finish
+			// then swap the contents of the buffered gradients and the new gradient matrices and fire an async aggreagation
+			// of the new gradient matrices
+			if (m_pendingAsyncAggregation.valid())
+			{
+				Timer aggregationTimer;
+				if (showSyncPerfStats)
+					aggregationTimer.Start();
 
-                m_pendingAsyncAggregation.get();
+				m_pendingAsyncAggregation.get();
 
-                if (showSyncPerfStats)
-                {
-                    aggregationTimer.Stop();
-                    double gradientAggregationTime = aggregationTimer.ElapsedSeconds();
-                    fprintf(stderr, "Async gradient aggregation wait time: %.6g\n", gradientAggregationTime);
-                }
-            }
+				if (showSyncPerfStats)
+				{
+					aggregationTimer.Stop();
+					double gradientAggregationTime = aggregationTimer.ElapsedSeconds();
+					fprintf(stderr, "Async gradient aggregation wait time: %.6g\n", gradientAggregationTime);
+				}
+			}
 
-            std::vector<Matrix<ElemType>*> newGradients;
-            size_t numGradMatrices = gradients.size();
-            for (size_t i = 0; i < numGradMatrices; i++)
-            {
-                Matrix<ElemType>* bufferedGradientMatrix = m_bufferedGradients[gradients[i]].get();
-                if ((bufferedGradientMatrix == nullptr) ||
-                    (bufferedGradientMatrix->GetNumCols() != gradients[i]->GetNumCols()) ||
-                    (bufferedGradientMatrix->GetNumRows() != gradients[i]->GetNumRows()) ||
-                    (bufferedGradientMatrix->GetDeviceId() != gradients[i]->GetDeviceId()))
-                {
-                    LogicError("No buffered gradient matrix found corresponding to a gradient matrix to be aggregated!");
-                }
+			std::vector<Matrix<ElemType>*> newGradients;
+			size_t numGradMatrices = gradients.size();
+			for (size_t i = 0; i < numGradMatrices; i++)
+			{
+				Matrix<ElemType>* bufferedGradientMatrix = m_bufferedGradients[gradients[i]].get();
+				if ((bufferedGradientMatrix == nullptr) ||
+					(bufferedGradientMatrix->GetNumCols() != gradients[i]->GetNumCols()) ||
+					(bufferedGradientMatrix->GetNumRows() != gradients[i]->GetNumRows()) ||
+					(bufferedGradientMatrix->GetDeviceId() != gradients[i]->GetDeviceId()))
+				{
+					LogicError("No buffered gradient matrix found corresponding to a gradient matrix to be aggregated!");
+				}
 
-                // Swap the gradient matrix contents with the buffered matrices
-                std::swap(*(gradients[i]), *bufferedGradientMatrix);
+				// Swap the gradient matrix contents with the buffered matrices
+				std::swap(*(gradients[i]), *bufferedGradientMatrix);
 
-                newGradients.push_back(bufferedGradientMatrix);
-            }
+				newGradients.push_back(bufferedGradientMatrix);
+			}
 
-            // Swap the grad header contents with the buffered grad header
-            swap(*headerCPU, *m_bufferedGradHeader);
+			// Swap the grad header contents with the buffered grad header
+			swap(*headerCPU, *m_bufferedGradHeader);
 
-            // Initiate aggregation only if any samples were processed in previous iteration
-            if (resetState || (headerCPU->numSamples != 0))
-            {
-                int deviceId = gradients[0]->GetDeviceId();
-                DistGradHeader* newGradHeader = m_bufferedGradHeader;
+			// Initiate aggregation only if any samples were processed in previous iteration
+			if (resetState || (headerCPU->numSamples != 0))
+			{
+				int deviceId = gradients[0]->GetDeviceId();
+				DistGradHeader* newGradHeader = m_bufferedGradHeader;
 
-                // Since we will be aggregating the gradients assynchronously, let us
-                // ensure that the gradient matrices have been computed before starting to aggregate
-                // them asynchronously on another thread. This essentially means that when we are using
-                // a GPU device, we will synchronize on the main GPU compute stream before starting
-                // the gradient aggregation asynchronously on a separate stream
-                MatrixComputeStreamEvent* mainStreamSyncEvent = MatrixComputeStreamEvent::Create(deviceId);
+				// Since we will be aggregating the gradients assynchronously, let us
+				// ensure that the gradient matrices have been computed before starting to aggregate
+				// them asynchronously on another thread. This essentially means that when we are using
+				// a GPU device, we will synchronize on the main GPU compute stream before starting
+				// the gradient aggregation asynchronously on a separate stream
+				MatrixComputeStreamEvent* mainStreamSyncEvent = MatrixComputeStreamEvent::Create(deviceId);
 
-                m_pendingAsyncAggregation = std::async(std::launch::async, [=] {
-                    // We are starting on a new thread. Make sure the new thread is
-                    // setup to use the right device
-                    Matrix<ElemType>::SetDevice(deviceId);
+				m_pendingAsyncAggregation = std::async(std::launch::async, [=] {
+					// We are starting on a new thread. Make sure the new thread is
+					// setup to use the right device
+					Matrix<ElemType>::SetDevice(deviceId);
 
-                    // Synchronize the Quantization compute stream with the completion of
-                    // compute of the gradient matrices on the main compute stream
-                    mainStreamSyncEvent->SynchronizeDataTransferFetchStreamWithEvent<ElemType>();
-                    delete mainStreamSyncEvent;
+					// Synchronize the Quantization compute stream with the completion of
+					// compute of the gradient matrices on the main compute stream
+					mainStreamSyncEvent->SynchronizeDataTransferFetchStreamWithEvent<ElemType>();
+					delete mainStreamSyncEvent;
 
-                    AggregateGradientsImpl(newGradients, newGradHeader, showSyncPerfStats);
-                });
+					AggregateGradientsImpl(newGradients, newGradHeader, showSyncPerfStats);
+				});
 
-                return true;
-            }
+				return true;
+			}
 
-            return false;
-        }
-        else
-        {
-            AggregateGradientsImpl(gradients, headerCPU, showSyncPerfStats);
-            return (headerCPU->numSamples != 0);
-        }
-    }
+			return false;
+		}
+		else
+		{
+			AggregateGradientsImpl(gradients, headerCPU, showSyncPerfStats);
+			return (headerCPU->numSamples != 0);
+		}
+	}
 
 private:
-    std::shared_ptr<ElemType> AllocateIntermediateBuffer(int deviceID, size_t numElements)
-    {
-        assert(deviceID >= 0);
+	std::shared_ptr<ElemType> AllocateIntermediateBuffer(int deviceID, size_t numElements)
+	{
+		assert(deviceID >= 0);
 
-        // Use pinned memory for GPU devices for better copy performance
-        size_t totalSize = sizeof(ElemType) * numElements;
-        return std::shared_ptr<ElemType>((ElemType*) m_allocator->Malloc(totalSize), [this, deviceID](ElemType* p) {
-            m_allocator->Free(p);
-        });
-    }
+		// Use pinned memory for GPU devices for better copy performance
+		size_t totalSize = sizeof(ElemType) * numElements;
+		return std::shared_ptr<ElemType>((ElemType*)m_allocator->Malloc(totalSize), [this, deviceID](ElemType* p) {
+			m_allocator->Free(p);
+		});
+	}
 
-    bool ShouldCopyDataToCPU(int deviceId)
-    {
-        // Do not copy if data is on CPU
-        if (deviceId == CPUDEVICE)
-            return false;
+	bool ShouldCopyDataToCPU(int deviceId)
+	{
+		// Do not copy if data is on CPU
+		if (deviceId == CPUDEVICE)
+			return false;
 
-        // Do not copy if NCCL is supported or GPUDirect RDMA is used
-        if (m_nccl->IsSupported() || m_mpi->UseGpuGdr() == true)
-            return false;
+		// Do not copy if NCCL is supported or GPUDirect RDMA is used
+		if (m_nccl->IsSupported() || m_mpi->UseGpuGdr() == true)
+			return false;
 
-        return true;
-    }
+		return true;
+	}
 
     void ResetState(const std::vector<Matrix<ElemType>*>& gradients, int numEvalNodes, bool resetState)
     {

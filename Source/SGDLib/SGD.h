@@ -21,6 +21,7 @@
 #include "MASGD.h"
 #include "ASGDHelper.h"
 #include <map>
+#include "IDistGradAggregator.h"
 using namespace std; // ugh! TODO: get rid of this from .h files!!!
 
 #define CNTK_CHECKPOINT_VERSION_1 1     // 1 -> no version number 
@@ -369,6 +370,8 @@ protected:
 
 template <class ElemType>
 class IDistGradAggregator;
+class IMixTypedDistGradAggregator;
+struct GradientPackage;
 
 // -----------------------------------------------------------------------
 // class SGD

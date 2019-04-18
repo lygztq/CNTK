@@ -1046,6 +1046,26 @@ void SGD<ElemType>::TrainOrAdaptModel(int startEpoch, ComputationNetworkPtr net,
         m_pASGDHelper.reset();
 }
 
+template <class NodeType>
+static void PushIntoGradientPackage(std::shared_ptr<ComputationNode<NodeType>> node, std::vector<std::shared_ptr<Matrix<NodeType>>>& gradients)
+{
+	if (node->IsParameterUpdateRequired())
+	{
+		auto currParamsGradient = dynamic_pointer_cast<Matrix<NodeType>>(node->GradientPtr());
+
+		// Sometimes, in parallel training, the current node may not get any samples to process
+		// In this case, the gradient matrix may not have been sized yet. If so, lets size it.
+		if (currParamsGradient->GetNumCols() == 0)
+		{
+			auto currParamsValues = dynamic_pointer_cast<Matrix<NodeType>>(node->ValuePtr());
+			currParamsGradient->Resize(currParamsValues->GetNumRows(), currParamsValues->GetNumCols());
+		}
+
+		gradients.push_back(currParamsGradient);
+	}
+}
+
+
 // -----------------------------------------------------------------------
 // TrainOneEpoch() -- train one epoch
 // -----------------------------------------------------------------------
@@ -1122,7 +1142,8 @@ size_t SGD<ElemType>::TrainOneEpoch(ComputationNetworkPtr net,
         blockSizePerWorker = m_modelAggregationBlockSize / m_mpi->NumNodesInUse();
     }
 
-    std::vector<Matrix<ElemType>*> learnParamsGradients;
+	GradientPackage learnParamsGradientPackage;
+	std::vector<Matrix<ElemType>*> learnParamsGradients;
     Profiler profiler(m_numMBsToCUDAProfile);
 
     // resetting this, so profiling is performed for one epoch only
@@ -1461,27 +1482,24 @@ size_t SGD<ElemType>::TrainOneEpoch(ComputationNetworkPtr net,
         else
         {
             // distributed gradient aggregation
-            if (learnParamsGradients.size() == 0)
+            if (learnParamsGradients.IsEmpty())
             {
                 // lazily form the list of smoothedGradients to exchange
-                learnParamsGradients.reserve(learnableNodes.size());
                 for (auto nodeIter = learnableNodes.begin(); nodeIter != learnableNodes.end(); nodeIter++)
                 {
                     ComputationNodePtr node = dynamic_pointer_cast<ComputationNode<ElemType>>(*nodeIter);
-                    if (node->IsParameterUpdateRequired())
-                    {
-                        Matrix<ElemType>* currParamsGradient = &(node->Gradient()); // TODO: we can use shared_ptrs now
+					auto nodeFloat = dynamic_pointer_cast<ComputationNode<float>>(*nodeIter);
+					auto nodeHalf = dynamic_pointer_cast<ComputationNode<half>>(*nodeIter);
+					auto nodeDouble = dynamic_pointer_cast<ComputationNode<double>>(*nodeIter);
 
-                        // Sometimes, in parallel training, the current node may not get any samples to process
-                        // In this case, the gradient matrix may not have been sized yet. If so, lets size it.
-                        if (currParamsGradient->GetNumCols() == 0)
-                        {
-                            Matrix<ElemType>* currParamsValues = &(node->Value());
-                            currParamsGradient->Resize(currParamsValues->GetNumRows(), currParamsValues->GetNumCols());
-                        }
-
-                        learnParamsGradients.push_back(currParamsGradient);
-                    }
+					if (nodeFloat)
+						PushIntoGradientPackage<float>(nodeFloat, learnParamsGradients.m_gradFloat);
+					else if (nodeHalf)
+						PushIntoGradientPackage<half>(nodeHalf, learnParamsGradients.m_gradHalf);
+					else if (nodeDouble)
+						PushIntoGradientPackage<double>(nodeDouble, learnParamsGradients.m_gradDouble);
+					else
+						RuntimeError("Type is not supported.");
                 }
             }
 
