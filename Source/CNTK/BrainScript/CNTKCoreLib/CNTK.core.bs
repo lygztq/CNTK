@@ -64,18 +64,18 @@ MarginInnerProductLayer {inputDimension, outputDimension, base, gamma, power, la
 
 # FeatureNormalizeLayer -- create a feature normalization layer
 # Note: outputDimension may describe a tensor as well.
-FeatureNormalizeLayer {featureNormalizeType=2} =
+FeatureNormalizeLayer {featureNormalizeType=2, precision=precision} =
 {
-    apply (feature) = FeatureNormalize(feature, featureNormalizeType=featureNormalizeType)
+    apply (feature) = FeatureNormalize(feature, featureNormalizeType=featureNormalizeType, precision=precision)
 }.apply
 
 # AdditiveFullConnectionLayer -- create a label-specific-add full connection layer
 # Note: outputDimension may describe a tensor as well.
-AdditiveFullConnectionLayer {inputDimension, outputDimension, weightNormalize=true, bias=0, annealBias=false, biasBase=0, biasGamma=0, biasPower=1, biasMin=0, biasMax=0, init='glorotUniform', initValueScale=1} =
+AdditiveFullConnectionLayer {inputDimension, outputDimension, weightNormalize=true, bias=0, annealBias=false, biasBase=0, biasGamma=0, biasPower=1, biasMin=0, biasMax=0, init='glorotUniform', initValueScale=1, precision=precision} =
 {
-    W = ParameterTensor {_ConcatArrays (outputDimension, inputDimension), init=init, initValueScale=initValueScale}
+    W = ParameterTensor {_ConcatArrays (outputDimension, inputDimension), init=init, initValueScale=initValueScale, precision=precision}
 
-    apply (labelSequence, outProbVectorSequence) = AdditiveFullConnection(labelSequence, outProbVectorSequence, W, outputDimension=outputDimension, weightNormalize=weightNormalize, bias=bias, annealBias=annealBias, biasBase=biasBase, biasGamma=biasGamma, biasPower=biasPower, biasMin=biasMin, biasMax=biasMax)
+    apply (labelSequence, outProbVectorSequence) = AdditiveFullConnection(labelSequence, outProbVectorSequence, W, outputDimension=outputDimension, weightNormalize=weightNormalize, bias=bias, annealBias=annealBias, biasBase=biasBase, biasGamma=biasGamma, biasPower=biasPower, biasMin=biasMin, biasMax=biasMax, precision=precision)
 }.apply
 
 # GlobalConcatLayer -- create a concat layer, which uses temporary global memory to save the output
@@ -530,13 +530,13 @@ CNTK2 = [
     #
     # FeatureNormalize node
     #
-    FeatureNormalize(feature, featureNormalizeType=2, tag='') = 
+    FeatureNormalize(feature, featureNormalizeType=2, tag='', precision=precision) = 
         new ComputationNode [ operation = 'FeatureNormalize' ; inputs = _AsNodes (feature) /*plus the function args*/ ]
 
     #
     # AdditiveFullConnection node
     #
-    AdditiveFullConnection(labelSequence, outProbVectorSequence, W, outputDimension=0, weightNormalize=true, bias=0, annealBias=false, biasBase=0, biasGamma=0, biasPower=0, biasMin=0, biasMax=0,tag='') = 
+    AdditiveFullConnection(labelSequence, outProbVectorSequence, W, outputDimension=0, weightNormalize=true, bias=0, annealBias=false, biasBase=0, biasGamma=0, biasPower=0, biasMin=0, biasMax=0,tag='', precision=precision) = 
         new ComputationNode [ operation = 'AdditiveFullConnection' ; inputs = _AsNodes (labelSequence : outProbVectorSequence : W) /*plus the function args*/ ]
 
     #
