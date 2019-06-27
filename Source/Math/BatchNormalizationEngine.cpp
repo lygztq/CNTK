@@ -442,6 +442,51 @@ private:
 #endif
 };
 
+template <>
+class CntkBatchNormEngine<half, half> : public BatchNormEngine<half, half>
+{
+public:
+	using Base = BatchNormEngine<half, half>;
+	using typename Base::InoutMat;
+	using typename Base::StatMat;
+
+public:
+	CntkBatchNormEngine(DEVICEID_TYPE deviceId, const TensorShape& inOutT,
+		bool spatial, ImageLayoutKind imageLayout)
+		: Base(deviceId, inOutT, spatial, imageLayout)
+	{
+		if (deviceId != GPU)
+			InvalidArgument("Pure half batch normalization supports only GPU version.");
+	}
+
+protected:
+	using Base::m_deviceId;
+	using Base::m_imageLayout;
+	using Base::m_inOutT;
+	using Base::m_spatial;
+
+	void EnsureCompatible() override
+	{
+		if (m_spatial && m_imageLayout == ImageLayoutKind::HWC)
+			InvalidArgument("CNTK batch normalization supports only cudnn(CHW) layout.");
+	}
+
+	void ForwardCore(const InoutMat& in, const StatMat& scale, const StatMat& bias, bool inferenceOnly, double expAvgFactor, double blendFactor, StatMat& runMean, StatMat& runVariance,
+		InoutMat& out, double epsilon, StatMat& savedMean, StatMat& savedInvStdDev) override
+	{
+		in.BatchNormalizationForward(scale, bias, inferenceOnly, expAvgFactor, blendFactor, runMean, runVariance, out, epsilon, savedMean, savedInvStdDev);
+	}
+
+	void BackwardCore(const InoutMat& in, const InoutMat& srcGrad, InoutMat& grad, const StatMat& scale, double blendFactor, const StatMat& savedMean, const StatMat& savedInvStdDev,
+		StatMat& scaleGrad, StatMat& biasGrad, bool accumulateDataGrad) override
+	{
+		if (!accumulateDataGrad)
+			grad.SetValue((half)0);
+
+		srcGrad.BatchNormalizationBackward(in, grad, scale, blendFactor, savedMean, savedInvStdDev, scaleGrad, biasGrad);
+	}
+};
+
 template class CntkBatchNormEngine<float, float>;
 template class CntkBatchNormEngine<double, double>;
 
@@ -475,8 +520,25 @@ std::unique_ptr<BatchNormEngine<InoutType, StatType>> BatchNormEngine<InoutType,
     RuntimeError("Could not find appropriate batch normalization engine.");
 }
 
+template <>
+std::unique_ptr<BatchNormEngine<half, half>> BatchNormEngine<half, half>::Create(DEVICEID_TYPE deviceId, const TensorShape& inOutT,
+	bool spatial, ImageLayoutKind imageLayout,
+	BatchNormEngineKind enabledEngines)
+{
+	// Use CNTK as default batch norm engine.
+	if (HasFlag(enabledEngines, BatchNormEngineKind::Cntk))
+	{
+		if (GetMathLibTraceLevel() > 0)
+			fprintf(stderr, "Using CNTK batch normalization engine.\n");
+
+		return std::make_unique<CntkBatchNormEngine<half, half>>(deviceId, inOutT, spatial, imageLayout);
+	}
+
+	RuntimeError("Could not find appropriate batch normalization engine.");
+}
+
 template class BatchNormEngine<float, float>;
 template class BatchNormEngine<double, double>;
 template class BatchNormEngine<half, float>;
-
+template class BatchNormEngine<half, half>;
 }}}

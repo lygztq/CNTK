@@ -5000,6 +5000,23 @@ void Matrix<ElemType>::BatchNormalizationForward(const Matrix<StatType>& scale, 
                             NOT_IMPLEMENTED);
 }
 
+template <>
+template <>
+void Matrix<half>::BatchNormalizationForward(const Matrix<half>& scale, const Matrix<half>& bias, bool inferenceOnly, double expAvgFactor, double blendFactor,
+											 Matrix<half>& runMean, Matrix<half>& runVariance, Matrix<half>& out, double epsilon,
+											 Matrix<half>& saveMean, Matrix<half>& saveInvStdDev) const
+{
+	DecideAndMoveToRightDevice(*this, out);
+
+	DISPATCH_MATRIX_ON_FLAG(this,
+							this,
+							NOT_IMPLEMENTED,
+							m_GPUMatrix->BatchNormalizationForward(*(scale.m_GPUMatrix), *(bias.m_GPUMatrix), inferenceOnly, expAvgFactor, blendFactor,
+								*(runMean.m_GPUMatrix), *(runVariance.m_GPUMatrix),
+								*(out.m_GPUMatrix), epsilon, *(saveMean.m_GPUMatrix), *(saveInvStdDev.m_GPUMatrix)),
+							NOT_IMPLEMENTED,
+							NOT_IMPLEMENTED);
+}
 
 #pragma region Asoftmax
 
