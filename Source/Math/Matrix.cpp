@@ -5184,6 +5184,25 @@ void Matrix<ElemType>::BatchNormalizationBackward(const Matrix<ElemType>& in, Ma
                             NOT_IMPLEMENTED);
 }
 
+template <>
+template <>
+void Matrix<half>::BatchNormalizationBackward(const Matrix<half>& in, Matrix<half>& grad, const Matrix<half>& scale, double blendFactor,
+	const Matrix<half>& saveMean, const Matrix<half>& saveInvStdDev,
+	Matrix<half>& scaleGrad, Matrix<half>& biasGrad) const
+{
+	DecideAndMoveToRightDevice(*this, grad);
+
+	// REVIEW alexeyk: add sparse version.
+	DISPATCH_MATRIX_ON_FLAG(this,
+		this,
+		NOT_IMPLEMENTED,
+		m_GPUMatrix->BatchNormalizationBackward(*(in.m_GPUMatrix), *(grad.m_GPUMatrix), *(scale.m_GPUMatrix), blendFactor,
+			*(saveMean.m_GPUMatrix), *(saveInvStdDev.m_GPUMatrix),
+			*(scaleGrad.m_GPUMatrix), *(biasGrad.m_GPUMatrix)),
+		NOT_IMPLEMENTED,
+		NOT_IMPLEMENTED);
+}
+
 template <class ElemType>
 void Matrix<ElemType>::RNNForward(const Matrix<ElemType> &inputX, const Matrix<ElemType> &paramW, size_t xDim, size_t yDim, const vector<size_t>& numSequencesForFrame, const RnnAttributes& rnnAttributes, Matrix<ElemType>& reserve, Matrix<ElemType>& workspace)
 {

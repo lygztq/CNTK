@@ -377,6 +377,7 @@ template class DropoutNode<half>;
 template class BatchNormalizationNode<float>;
 template class BatchNormalizationNode<double>;
 template class BatchNormalizationNode<half>;
+template class BatchNormalizationNode<half, true>;
 
 template class MarginInnerProductNode<float>;
 template class MarginInnerProductNode<double>;

@@ -259,7 +259,17 @@ shared_ptr<ComputationNodeBase> NewComputationNodeFromConfig(const Microsoft::MS
 		else if (precision == L"double")
 			node = CreateNode<double>(operationName, configp);
 		else if (precision == L"half" || precision == L"float16")
-			node = CreateNode<half>(operationName, configp);
+		{
+			if (operationName == OperationNameOf(BatchNormalizationNode))
+			{
+				bool pureHalf = (*configp)(L"pureFP16BatchNorm", false);
+				if (pureHalf)
+					node = New<BatchNormalizationNode<half, true>>(configp);
+				else node = CreateNode<half>(operationName, configp);
+			}
+			else
+				node = CreateNode<half>(operationName, configp);
+		}
 		else
 			RuntimeError("NewStandardNode: Invalid value '%ls' for 'precision' parameter. Must be 'float', 'half' or 'double'.", precision.c_str());
 	}

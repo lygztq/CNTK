@@ -455,7 +455,7 @@ public:
 		bool spatial, ImageLayoutKind imageLayout)
 		: Base(deviceId, inOutT, spatial, imageLayout)
 	{
-		if (deviceId != GPU)
+		if (deviceId == CPUDEVICE)
 			InvalidArgument("Pure half batch normalization supports only GPU version.");
 	}
 

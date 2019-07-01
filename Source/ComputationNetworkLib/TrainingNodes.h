@@ -4337,7 +4337,7 @@ public:
 // * disableRegularization is a Boolean flag that specifies this batch normalization node turns off regularization or not.
 // * imageLayout is the image layout. Only cudnn is supported at present.
 // -----------------------------------------------------------------------
-template <class ElemType>
+template <class ElemType, bool PureHalf=false>
 class BatchNormalizationNode : public ComputationNodeNonLooping<ElemType>, public IFreezable, public IdentityTransformerNodeOnOneInput<0>
 {
     typedef ComputationNodeNonLooping<ElemType> Base;
@@ -4347,9 +4347,9 @@ class BatchNormalizationNode : public ComputationNodeNonLooping<ElemType>, publi
         return L"BatchNormalization";
     }
 
-	typedef typename std::conditional<std::is_same<ElemType, half>::value, float, ElemType>::type StatType;
+	typedef typename std::conditional<std::is_same<ElemType, half>::value && !PureHalf, float, ElemType>::type StatType;
 
-	template <typename NodeDataType> friend class BatchNormalizationNode;
+	template <typename NodeDataType, bool PureHalf> friend class BatchNormalizationNode;
 
     // inputs
     // TODO: Change all of these throughout the codebase to 'class enum'. Also change all places where we still use integer constants.
@@ -4829,6 +4829,9 @@ public:
 
     void Validate(bool isFinalValidationPass) override
     {
+		if (!m_useCntkEngine && PureHalf)
+			InvalidArgument("Pure half batch normalization is only supported via Cntk Engine.");
+
         if (Input(DATA)->OperationName() == L"GlobalConcat")
             m_connectGlobalConcat = true;
 
